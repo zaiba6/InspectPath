@@ -5,8 +5,8 @@ import {
   validateMetricPlan,
   validateTriggerRecord,
 } from "../data/validators";
-import metricStructure from "../mocks/structure_kw51_sample.json";
-import metricPlan from "../mocks/plan_kw51_optimized_sample.json";
+import metricStructure from "./fixtures/structure_kw51_sample.json";
+import metricPlan from "./fixtures/plan_kw51_optimized_sample.json";
 
 // ---- contract §2: replay ----
 

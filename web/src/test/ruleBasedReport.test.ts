@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { buildRuleBasedReport } from "../features/report/ruleBasedReport";
-import structure from "../mocks/structure_kw51_sample.json";
-import planOptimized from "../mocks/plan_kw51_optimized_sample.json";
-import findingsMock from "../mocks/findings.json";
+import structure from "./fixtures/structure_kw51_sample.json";
+import planOptimized from "./fixtures/plan_kw51_optimized_sample.json";
+import findingsMock from "./fixtures/findings.json";
 import type {
   AlertHistoryEntry,
   Finding,

@@ -14,13 +14,9 @@ export type LoadResult<T> =
   | { ok: true; value: T; file: string }
   | { ok: false; file: string; reason: string };
 
-// The single seam between the dashboard and its data.
-// Today only mockSource implements this; a realSource can be added later
-// with no changes to the views.
+// The single seam between the dashboard and its data. realSource is the only
+// implementation; it reads the real data/ files and never substitutes others.
 export interface DataSource {
-  // True when this source serves mock/sample data rather than real sensor data.
-  // The UI uses this to avoid claiming real data in the monitor subtitle/footer.
-  readonly isMock: boolean;
   getReplay(dataset: string): Promise<LoadResult<TriggerRecord[]>>; // [contract §2]
   getMetricStructure(): Promise<LoadResult<MetricStructure>>; // [contract §3b]
   getMetricPlan(type: PlanType): Promise<LoadResult<MetricPlan>>; // [contract §4b]

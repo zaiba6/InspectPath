@@ -1015,8 +1015,6 @@ body {
   border-top: 2px dashed var(--route-remaining);
 }
 
-/* Dataset picker fallback note: shown when a real dataset is selected but the
-   active source fell back to the mock (so the picker never lies). */
 /* A data file couldn't be loaded. Shown instead of any data; neutral (it is
    about the app, not the bridge), never an alert-level color. */
 .load-error {

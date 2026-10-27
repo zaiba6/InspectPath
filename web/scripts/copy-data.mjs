@@ -29,10 +29,12 @@ async function isDir(p) {
 }
 
 async function main() {
-  // No data/ yet (teammates haven't produced outputs). Nothing to copy; the
-  // dashboard falls back to mocks. Not an error.
+  // No data/ folder. Nothing to copy; the dashboard will show which data files
+  // it couldn't load (there is no mock data to fall back to).
   if (!existsSync(SRC)) {
-    console.log("[copy-data] No repo-root data/ folder found; skipping (using mocks).");
+    console.log(
+      "[copy-data] No repo-root data/ folder found; skipping. The dashboard will report the missing files."
+    );
     return;
   }
 

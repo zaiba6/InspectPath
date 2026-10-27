@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import replay from "../mocks/replay_z24.json";
-import structure from "../mocks/structure_kw51_sample.json";
-import planNaive from "../mocks/plan_kw51_naive_sample.json";
-import planOptimized from "../mocks/plan_kw51_optimized_sample.json";
-import imageMap from "../mocks/image_map.json";
-import defectResponses from "../mocks/defect_responses.json";
+import replay from "./fixtures/replay_z24.json";
+import structure from "./fixtures/structure_kw51_sample.json";
+import planNaive from "./fixtures/plan_kw51_naive_sample.json";
+import planOptimized from "./fixtures/plan_kw51_optimized_sample.json";
+import imageMap from "./fixtures/image_map.json";
+import defectResponses from "./fixtures/defect_responses.json";
 
 const ALERT_LEVELS = ["normal", "watch", "warning", "alarm"];
 const QUALITY = ["ok", "degraded"];

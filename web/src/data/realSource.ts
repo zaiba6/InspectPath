@@ -253,7 +253,6 @@ async function getFindings(structure: MetricStructure): Promise<Finding[]> {
 }
 
 export const realSource: DataSource = {
-  isMock: false,
   getReplay,
   getMetricStructure,
   getMetricPlan,
