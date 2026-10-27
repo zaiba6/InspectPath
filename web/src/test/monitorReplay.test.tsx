@@ -15,7 +15,7 @@ import full from "../../../data/trigger/replay_kw51.json";
 function stubSource(records: TriggerRecord[]): DataSource {
   return {
     isMock: false,
-    getReplay: async () => records,
+    getReplay: async () => ({ ok: true, value: records, file: "replay.json" }),
     getMetricStructure: async () => {
       throw new Error("not needed");
     },

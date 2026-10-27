@@ -1025,11 +1025,30 @@ body {
 
 /* Dataset picker fallback note: shown when a real dataset is selected but the
    active source fell back to the mock (so the picker never lies). */
-.dataset-fallback-note {
-  display: block;
-  margin-top: 0.3rem;
-  font-size: var(--text-label);
-  color: #7a3f00;
+/* A data file couldn't be loaded. Shown instead of any data; neutral (it is
+   about the app, not the bridge), never an alert-level color. */
+.load-error {
+  margin-top: var(--sp-4);
+  padding: var(--sp-4);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-left-width: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.load-error-title {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--text-section);
+  font-weight: 600;
+}
+
+.load-error p {
+  margin: 0 0 var(--sp-1);
+}
+
+.load-error code {
+  overflow-wrap: anywhere;
 }
 
 /* ---- Imaged-connections strip (always-visible gallery of the imaged findings) ---- */

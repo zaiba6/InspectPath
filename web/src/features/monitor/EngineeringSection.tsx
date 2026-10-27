@@ -15,7 +15,6 @@ import {
 // from ml/trigger/results.md; it cannot be derived from the demo replay window
 // alone, so it is cited from the repo with its source shown on screen.
 const MODEL_R_SQUARED_FROM_RESULTS_MD = 0.409;
-const REPLAY_FILE = "replay_kw51_demo.json";
 const ZENODO_RECORD = "3745914";
 
 function fmt(n: number, d = 2) {
@@ -28,11 +27,13 @@ export default function EngineeringSection({
   history,
   upToIndex,
   window,
+  sourceFile,
 }: {
   current: TriggerRecord;
   history: TriggerRecord[];
   upToIndex: number;
   window: number;
+  sourceFile: string; // the replay file that actually loaded
 }) {
   const model = recoverTempModel(history);
   const resStd = normalResidualStd(history);
@@ -128,7 +129,7 @@ export default function EngineeringSection({
             <h3 className="chart-title">Source</h3>
             <p className="eng-text muted">
               KW51 railway bridge monitoring dataset, Zenodo record {ZENODO_RECORD}.
-              Replay file: {REPLAY_FILE}. Timestamps are the dataset's recorded
+              Replay file: {sourceFile}. Timestamps are the dataset's recorded
               times (UTC), not live readings.
             </p>
           </section>

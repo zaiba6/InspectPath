@@ -121,6 +121,18 @@ export function recoverTempModel(
 // Format an ISO timestamp in UTC (the data is UTC; KW51 is in Belgium but the
 // dataset records UTC). Always labeled "UTC" so the reader is never shown
 // browser-local time. Example: "2019-06-27 10:00 UTC".
+// KW51 retrofit period, as defined in ml/trigger/trigger_model.py:
+// HEALTHY_END = "2019-05-15" (retrofit starts at 00:00 UTC that day) and
+// RETROFIT_END = "2019-09-27" (through 23:59:59 that day).
+export const RETROFIT_START = "2019-05-15T00:00:00Z";
+export const RETROFIT_END_EXCLUSIVE = "2019-09-28T00:00:00Z";
+
+// Whether a reading's timestamp falls inside the retrofit period.
+export function inRetrofitPeriod(iso: string): boolean {
+  const t = Date.parse(iso);
+  return t >= Date.parse(RETROFIT_START) && t < Date.parse(RETROFIT_END_EXCLUSIVE);
+}
+
 export function fmtUtc(iso: string): string {
   const d = new Date(iso);
   const p = (n: number) => String(n).padStart(2, "0");

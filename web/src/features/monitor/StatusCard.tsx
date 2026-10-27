@@ -1,7 +1,7 @@
 import type { AlertLevel, TriggerRecord } from "../../data/types";
 import { alertStyle } from "../../data/alertLevels";
 import { useViewState } from "../../app/viewState";
-import { THRESHOLDS, fmtUtc } from "./monitorMetrics";
+import { THRESHOLDS, fmtUtc, inRetrofitPeriod } from "./monitorMetrics";
 
 // Glyph per level so level never relies on color alone.
 const LEVEL_ICON: Record<AlertLevel, string> = {
@@ -38,7 +38,8 @@ function directionSentence(residualPct: number): string {
 // alert hero and the red escalation banner. Shows the level, since when, a
 // plain direction sentence, the recommendation, and (for watch/warning/alarm)
 // the Dispatch inspection button. Normal is a calm version with no button.
-// Item 2: a context note that the June 2019 demo falls in KW51's retrofit period.
+// Item 2: a context note, shown only while the CURRENT reading's timestamp is
+// inside KW51's retrofit period (checked on the data, not the picker).
 export default function StatusCard({
   record,
   since,
@@ -82,11 +83,13 @@ export default function StatusCard({
         </button>
       )}
 
-      <p className="status-context muted">
-        Context: this demo replays recorded KW51 data from June 2019, which falls
-        inside the bridge's retrofit period (May to September 2019). Shifts in
-        this window may reflect the retrofit work, not damage.
-      </p>
+      {inRetrofitPeriod(record.timestamp) && (
+        <p className="status-context muted">
+          Context: this reading falls inside KW51's retrofit period (May 15 to
+          September 27, 2019). Shifts in this period may reflect the retrofit
+          work, not damage.
+        </p>
+      )}
     </section>
   );
 }

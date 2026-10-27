@@ -1,28 +1,20 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import Footer, { MOCK_DISCLAIMER } from "../components/Footer";
-import { mockSource } from "../data/mockSource";
+import Footer, { DISCLAIMER } from "../components/Footer";
 
+// Replaces the three mock-provenance tests (mock source flagged, mock footer,
+// mock disclaimer wording). Reason: there is no mock source or sample mode, so
+// the footer always carries the one real-data disclaimer.
 describe("data provenance labeling", () => {
-  it("mock source is flagged as mock", () => {
-    expect(mockSource.isMock).toBe(true);
-  });
-
-  it("footer shows the sample-data disclaimer when the source is mock", () => {
+  it("the footer always shows the real-data disclaimer", () => {
     render(<Footer />);
-    expect(screen.getByText(MOCK_DISCLAIMER)).toBeInTheDocument();
-    // Must not claim real data while on mocks.
-    expect(
-      screen.queryByText(/Simulation with real bridge data/i)
-    ).not.toBeInTheDocument();
+    expect(screen.getByText(DISCLAIMER)).toBeInTheDocument();
   });
 
-  it("the mock disclaimer does not claim real data", () => {
-    expect(MOCK_DISCLAIMER).toContain("Sample data for demonstration");
-    expect(MOCK_DISCLAIMER).not.toMatch(/real bridge data/i);
-    // Keeps the estimates-not-ratings wording.
-    expect(MOCK_DISCLAIMER).toContain(
-      "estimates, not engineering ratings"
+  it("the disclaimer keeps the estimates-not-ratings wording and never says sample", () => {
+    expect(DISCLAIMER).toBe(
+      "Simulation with real bridge data. Alerts and severity are estimates, not engineering ratings."
     );
+    expect(DISCLAIMER).not.toMatch(/sample|mock/i);
   });
 });

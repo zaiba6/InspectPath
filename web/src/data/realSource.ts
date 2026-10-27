@@ -1,4 +1,4 @@
-import type { DataSource } from "./source";
+import type { DataSource, LoadResult } from "./source";
 import type {
   DefectScores,
   DefectTier,
@@ -26,36 +26,45 @@ const PREDICT_URL =
   (import.meta.env.VITE_PREDICT_URL as string | undefined) ??
   "http://localhost:8001";
 
-// Fetches JSON, treating a non-OK status OR a non-JSON content-type as "missing".
-// The Vite dev server returns 200 + text/html (its SPA fallback) for files that
-// don't exist, so res.ok alone is not enough to conclude the file is present.
-async function fetchJson(path: string): Promise<unknown | null> {
+// Fetches JSON, treating a non-OK status OR a non-JSON content-type as missing,
+// and says which. The Vite dev server returns 200 + text/html (its SPA
+// fallback) for files that don't exist, so res.ok alone is not enough.
+async function loadJson(
+  path: string
+): Promise<{ ok: true; data: unknown } | { ok: false; reason: string }> {
   try {
     const res = await fetch(path, { method: "GET" });
-    if (!res.ok) return null;
+    if (!res.ok) return { ok: false, reason: `HTTP ${res.status}` };
     const contentType = res.headers.get("content-type") ?? "";
-    if (!contentType.includes("application/json")) return null;
-    return await res.json();
-  } catch {
-    return null;
+    if (!contentType.includes("application/json")) {
+      return {
+        ok: false,
+        reason: `expected JSON but got "${contentType || "unknown"}" (file not served)`,
+      };
+    }
+    return { ok: true, data: await res.json() };
+  } catch (e) {
+    return { ok: false, reason: `request failed (${String(e)})` };
   }
 }
 
-// ---- Replay (contract §2) ----
+async function fetchJson(path: string): Promise<unknown | null> {
+  const r = await loadJson(path);
+  return r.ok ? r.data : null;
+}
 
-async function getReplay(dataset: string): Promise<TriggerRecord[]> {
+// ---- Replay (contract §2) ----
+// A missing or invalid replay is an error naming the file. Nothing is shown in
+// its place.
+
+async function getReplay(dataset: string): Promise<LoadResult<TriggerRecord[]>> {
   const fileName = `replay_${dataset}.json`;
-  const raw = await fetchJson(`${DATA_BASE}/trigger/${fileName}`);
-  if (raw === null) {
-    // File not present yet: fall back to mock silently (expected pre-integration).
-    return mockSource.getReplay(dataset);
-  }
-  const res = validateReplay(raw, fileName);
-  if (!res.ok) {
-    addWarning({ piece: "replay", message: `${res.error}. Falling back to mock replay.` });
-    return mockSource.getReplay(dataset);
-  }
-  return res.value;
+  const file = `${DATA_BASE}/trigger/${fileName}`;
+  const loaded = await loadJson(file);
+  if (!loaded.ok) return { ok: false, file, reason: loaded.reason };
+  const res = validateReplay(loaded.data, fileName);
+  if (!res.ok) return { ok: false, file, reason: res.error };
+  return { ok: true, value: res.value, file };
 }
 
 // ---- Metric structure (contract §3b) ----

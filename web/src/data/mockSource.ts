@@ -1,4 +1,4 @@
-import type { DataSource } from "./source";
+import type { DataSource, LoadResult } from "./source";
 import type {
   TriggerRecord,
   PlanType,
@@ -21,10 +21,9 @@ import findings from "../mocks/findings.json";
 export const mockSource: DataSource = {
   isMock: true,
 
-  async getReplay(dataset: string): Promise<TriggerRecord[]> {
-    // Only one dataset shipped for the demo; dataset arg reserved for future sets.
+  async getReplay(dataset: string): Promise<LoadResult<TriggerRecord[]>> {
     void dataset;
-    return replayZ24 as TriggerRecord[];
+    return { ok: true, value: replayZ24 as TriggerRecord[], file: "replay_z24.json" };
   },
 
   async getMetricStructure(): Promise<MetricStructure> {

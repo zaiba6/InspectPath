@@ -11,9 +11,8 @@ import type { AlertHistoryEntry, BridgeSide, PlanType } from "../data/types";
 export type ActiveView = "monitor" | "inspection";
 export type ReplaySpeed = 1 | 5 | 20;
 
-// Selectable replay source. "kw51_demo"/"kw51" load real data/trigger files;
-// "mock" forces the built-in sample replay.
-export type ReplayDataset = "kw51_demo" | "kw51" | "mock";
+// Selectable replay source: the real data/trigger files. There is no mock option.
+export type ReplayDataset = "kw51_demo" | "kw51";
 
 interface ViewStateValue {
   activeView: ActiveView;

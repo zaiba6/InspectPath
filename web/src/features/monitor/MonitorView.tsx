@@ -14,24 +14,43 @@ import { useViewState } from "../../app/viewState";
 // residual chart 24, showing different spans).
 const CHART_WINDOW = 24;
 
-export default function MonitorView() {
-  const { current, loading, records, isMock } = useReplay();
-  const { replayCursor, replayDataset } = useViewState();
+// UTC calendar date of an ISO timestamp, e.g. "2019-06-22".
+function utcDate(iso: string): string {
+  return new Date(iso).toISOString().slice(0, 10);
+}
 
-  if (loading) {
+export default function MonitorView() {
+  const { current, loading, records, loadedFile, error } = useReplay();
+  const { replayCursor } = useViewState();
+
+  if (loading || error) {
     return (
       <div className="monitor">
         <div className="monitor-head">
           <div>
             <h2 className="view-title">Bridge monitor</h2>
           </div>
-          <DatasetPicker isMock={isMock} />
+          <DatasetPicker />
         </div>
-        <p className="placeholder">Loading monitor…</p>
+        {loading ? (
+          <p className="placeholder">Loading monitor…</p>
+        ) : (
+          error && (
+            <div className="load-error" role="alert">
+              <p className="load-error-title">
+                Bridge monitoring data couldn't be loaded.
+              </p>
+              <p>
+                File: <code>{error.file}</code> ({error.reason}).
+              </p>
+              <p className="muted">No readings are shown.</p>
+            </div>
+          )
+        )}
       </div>
     );
   }
-  if (!current || records.length === 0) {
+  if (!current || records.length === 0 || !loadedFile) {
     return <p className="placeholder">No monitor data available.</p>;
   }
 
@@ -42,12 +61,11 @@ export default function MonitorView() {
   const history = records.slice(0, index + 1);
   const since = currentLevelSince(history);
 
-  const isKw51 = !isMock && (replayDataset === "kw51_demo" || replayDataset === "kw51");
-  const subtitle = isMock
-    ? "Replaying sample sensor data (mock)"
-    : isKw51
-    ? "Replay of real bridge data (KW51, June 2019). Timestamps are recorded times, not live."
-    : `Replaying sensor node readings as if live (${current.source}).`;
+  // Dates come from the loaded records, not from the picker selection.
+  const subtitle =
+    `Replay of real bridge data (${current.source}, ` +
+    `${utcDate(records[0].timestamp)} to ${utcDate(records[records.length - 1].timestamp)} UTC). ` +
+    "Timestamps are recorded times, not live.";
 
   return (
     <div className="monitor">
@@ -57,7 +75,7 @@ export default function MonitorView() {
           <p className="muted">{subtitle}</p>
         </div>
         <div className="monitor-controls">
-          <DatasetPicker isMock={isMock} />
+          <DatasetPicker />
           <ReplayControls atEnd={atEnd} />
         </div>
       </div>
@@ -74,6 +92,7 @@ export default function MonitorView() {
         history={history}
         upToIndex={index}
         window={CHART_WINDOW}
+        sourceFile={loadedFile}
       />
     </div>
   );

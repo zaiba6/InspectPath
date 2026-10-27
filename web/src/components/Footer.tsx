@@ -1,18 +1,11 @@
-import { isMockActive } from "../data/activeSource";
-
-// Shown when running on real sensor data.
+// The dashboard only shows real data, so there is one disclaimer.
 export const DISCLAIMER =
   "Simulation with real bridge data. Alerts and severity are estimates, not engineering ratings.";
 
-// Shown while the data source is mock/sample data, so we never claim real data.
-export const MOCK_DISCLAIMER =
-  "Sample data for demonstration. Alerts and severity are estimates, not engineering ratings.";
-
 export default function Footer() {
-  const text = isMockActive() ? MOCK_DISCLAIMER : DISCLAIMER;
   return (
     <footer className="app-footer" role="contentinfo">
-      <p>{text}</p>
+      <p>{DISCLAIMER}</p>
     </footer>
   );
 }

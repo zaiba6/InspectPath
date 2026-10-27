@@ -4,18 +4,12 @@ import { realSource } from "./realSource";
 import { addWarning } from "./dataWarnings";
 import type { MetricPlan, MetricStructure, PlanType } from "./types";
 
-// Data-source switch: use the real source when the shared data/ outputs exist,
-// otherwise the mock source. Each piece inside realSource still falls back on
-// its own, so one missing piece never breaks the others.
-//
-// Resolution happens once at startup via initDataSource(). Until then, and if
-// no real data is present, getDataSource() returns the mock source.
+// The dashboard reads only the real data/ files. There is no mock source to
+// switch to: a file that can't be loaded is reported by name in the view that
+// needs it.
 
 export const DATA_BASE =
   (import.meta.env.VITE_DATA_BASE_URL as string | undefined) ?? "/data";
-
-// The replay file used to detect a real deployment. Matches the default dataset.
-const PROBE_FILE = "replay_kw51_demo.json";
 
 // Resolve an image-map path (relative, e.g. "images/test/x.png") to a URL the
 // browser can load, served under the data base (e.g. "/data/images/test/x.png").
@@ -27,76 +21,8 @@ export function resolveImageUrl(p: string | undefined): string | undefined {
   return `${DATA_BASE}/${clean}`;
 }
 
-let active: DataSource = mockSource;
-let initialized = false;
-
-// A real deployment is detected if an expected data/ entry point is reachable
-// AND returns JSON. The Vite dev server answers missing files with 200 + an
-// HTML SPA fallback, so we must check the content-type, not just res.ok.
-// We probe a trigger replay file (the piece that currently ships real data).
-// Returns ok=true when real data is present, or ok=false with a human reason
-// naming the probed URL and what went wrong, so the fallback is never silent.
-interface ProbeResult {
-  ok: boolean;
-  url: string;
-  reason?: string;
-}
-
-async function realDataPresent(): Promise<ProbeResult> {
-  const url = `${DATA_BASE}/trigger/${PROBE_FILE}`;
-  try {
-    const res = await fetch(url, { method: "GET" });
-    if (!res.ok) {
-      return { ok: false, url, reason: `HTTP ${res.status}` };
-    }
-    const contentType = res.headers.get("content-type") ?? "";
-    if (!contentType.includes("application/json")) {
-      // Vite's SPA fallback returns the app HTML for missing files.
-      return {
-        ok: false,
-        url,
-        reason: `expected JSON but got "${contentType || "unknown"}" (file not served)`,
-      };
-    }
-    return { ok: true, url };
-  } catch (e) {
-    return { ok: false, url, reason: `request failed (${String(e)})` };
-  }
-}
-
-// Reset the init-once state so tests can re-run the probe. Harmless in the app
-// (never called there).
-export function resetDataSourceForTest(): void {
-  initialized = false;
-  active = mockSource;
-  inspectionDataPromise = null;
-}
-
-export async function initDataSource(): Promise<DataSource> {
-  if (initialized) return active;
-  const probe = await realDataPresent();
-  active = probe.ok ? realSource : mockSource;
-  initialized = true;
-  if (!probe.ok) {
-    // Step 5: never fall back to mock silently. Name the file the probe could
-    // not reach so the user knows why the whole app is in sample mode.
-    addWarning({
-      piece: "replay",
-      message:
-        `Real data not found at ${probe.url} (${probe.reason}). ` +
-        `Showing sample data for the whole app.`,
-    });
-  }
-  return active;
-}
-
 export function getDataSource(): DataSource {
-  return active;
-}
-
-// Convenience: whether the active source serves mock data.
-export function isMockActive(): boolean {
-  return active.isMock;
+  return realSource;
 }
 
 // ---- Coherent metric geometry + plans ----
