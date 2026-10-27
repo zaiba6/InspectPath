@@ -30,6 +30,8 @@ defect model), shown in a React dashboard. Simulation only, on real public data.
 - Don't edit a test to make it pass. List every test change with its reason.
 - Keep all honesty labels and design tokens. Never invent numbers: every number
   on screen must come from data or the repo.
+- Never show mock or sample data to users. A file that can't be loaded is named
+  on screen instead; sample files are test fixtures only (`web/src/test/fixtures/`).
 - Verify from actual command output, not assumptions. Restart the dev server
   after any `data/` change.
 - Stop and ask before merging to `main`, installing anything, or deleting files.

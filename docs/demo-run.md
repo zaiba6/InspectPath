@@ -15,8 +15,8 @@ data/images/test/defects/...      <- defect + close-up crops
 ```
 
 Each path in `data/image_map.json` is `images/test/<...>.png`, loaded by the UI
-as `/data/images/test/<...>.png`. If the folder is missing, findings still work
-but show mock results (labeled "mock").
+as `/data/images/test/<...>.png`. If the folder is missing, each imaged
+connection shows "Not scored: image not available", with no tier and no scores.
 
 ## 2. Start the defect API on port 8001
 
@@ -29,7 +29,9 @@ python -m venv .venv
 pip install fastapi "uvicorn[standard]" pillow torch torchvision numpy python-multipart
 # Real model (uses artifacts\best.pt):
 uvicorn api.main:app --port 8001
-# OR no-model fallback (deterministic fake scores, no torch needed):
+# Test mode, for API testing only (deterministic fake scores, no torch needed).
+# The dashboard never shows these: findings read "Not scored: the defect model
+# is running in test mode".
 #   $env:MOCK_MODEL="1"; uvicorn api.main:app --port 8001
 ```
 
@@ -60,15 +62,20 @@ npm run dev     # predev copies data\ into web\public\data\ automatically
 
 Open the printed URL (default <http://localhost:5173/>).
 
-## 5. Confirm each piece: real vs mock
+## 5. Confirm each piece is loaded
 
-| Piece | Real when… | How to confirm in the UI |
-|---|---|---|
-| Replay | `data/trigger/replay_kw51_demo.json` present | Monitor subtitle reads "Replaying sensor node readings as if live (KW51 replay)" and footer says "Simulation with real bridge data…". Mock shows "Replaying sample sensor data (mock)" + "Sample data for demonstration…". Use the **Dataset** dropdown (KW51 demo / KW51 full / Mock). |
-| Structure | `data/structures/<id>.json` present | Grid map matches the real structure. Not shipped yet → mock grid (Bridge Section A). |
-| Plan | `web/src/planner/` module present | Route/stats from the planner. Not shipped yet → mock naive/optimized plans. |
-| Defects | Defect API up on 8001 **and** images in `data/images/` | Open a finding pin: if the detail has **no** "mock" note, it came from `/predict`. A yellow "Defect result is a mock…" note means that waypoint fell back. |
+The dashboard never shows mock or sample data. If a file can't be loaded, the
+view says so and names the file instead of showing anything in its place.
 
-Any contract-validation problem (a file present but malformed) shows a yellow
-**Data warning** banner above the views, naming the exact bad field; that piece
-then falls back to mock. No banner = no contract warnings.
+| Piece | Needs | Loaded | Not loaded |
+|---|---|---|---|
+| Replay | `data/trigger/replay_kw51_demo.json` (KW51 demo) or `replay_kw51.json` (KW51 full), chosen in the **Dataset** dropdown | Monitor subtitle reads "Replay of real bridge data (KW51 replay, <first date> to <last date> UTC)". | "Bridge monitoring data couldn't be loaded", with the file and the reason. No readings. |
+| Structure and plans | `data/structures/kw51_layout.json`, `data/plans/kw51_naive.json`, `data/plans/kw51_optimized.json` | The KW51 side elevation with the route. | "Bridge inspection data couldn't be loaded", with the file and the reason. No map, route, or findings. |
+| Defects | Defect API on 8001 (not in test mode) **and** images in `data/images/` | Imaged connections show a tier and scores. | Each one shows why it wasn't scored: the model isn't running, the model is in test mode, or the image isn't available. No tier, no scores, no map pin. |
+
+The retrofit context note on the status card appears only while the current
+reading is inside KW51's retrofit period (2019-05-15 to 2019-09-27).
+
+Other data problems (for example an image-map key that is not a connection in
+the layout) show a yellow **Data warning** banner above the views, naming the
+file or field.

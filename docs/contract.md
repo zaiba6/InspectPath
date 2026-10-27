@@ -226,6 +226,7 @@ File: `data/image_map.json`
 ```
 
 - Normal capture waypoints map to full CODEBRIM images; close-ups map to cropped defect patches.
+- For KW51 (`"kw51"`), each key is a connection `location_id` from section 3b, with an optional `"<location_id>_closeup"`. The dashboard treats these keys as the list of imaged connections. A key that is not a connection in the layout is skipped with a warning. The example above is the old grid form.
 - Demo images come from the defect model's test split only.
 - Images are local only and never committed (CODEBRIM license forbids redistribution).
 
