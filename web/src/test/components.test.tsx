@@ -7,7 +7,13 @@ import { TIER_COLOR } from "../data/tiers";
 import FindingDetail from "../features/inspection/FindingDetail";
 import StatsPanel from "../features/inspection/StatsPanel";
 import ImagedStrip from "../features/inspection/ImagedStrip";
-import type { Finding, ImageMap, MetricPlanStats } from "../data/types";
+import type {
+  Finding,
+  ImageMap,
+  MetricPlanStats,
+  NotScoredReason,
+  ScoredFinding,
+} from "../data/types";
 import { generateReport } from "../features/report/llmClient";
 
 describe("QualityBadge", () => {
@@ -49,10 +55,11 @@ describe("FindingDetail", () => {
     },
   };
 
-  const highWithCloseup: Finding = {
+  const highWithCloseup: ScoredFinding = {
     id: "f1",
     location_id: "A-deck-105020",
     side: "A",
+    status: "scored",
     tier: "high",
     scores: {
       crack: 0.74,
@@ -66,7 +73,7 @@ describe("FindingDetail", () => {
     has_closeup: true,
   };
 
-  const lowNoCloseup: Finding = {
+  const lowNoCloseup: ScoredFinding = {
     ...highWithCloseup,
     id: "f3",
     location_id: "C-deck-106020",
@@ -105,10 +112,10 @@ describe("FindingDetail", () => {
     expect(screen.queryByText("Close-up")).not.toBeInTheDocument();
   });
 
-  it("shows the real-scores CODEBRIM note when defect_source is predict", () => {
+  it("shows the real-scores CODEBRIM note for a scored finding", () => {
     render(
       <FindingDetail
-        finding={{ ...highWithCloseup, defect_source: "predict" }}
+        finding={highWithCloseup}
         imageMap={imageMap}
         structureId="kw51"
         onClose={() => {}}
@@ -117,22 +124,35 @@ describe("FindingDetail", () => {
     expect(
       screen.getByText(/CODEBRIM held-out test set; not photographs of KW51/i)
     ).toBeInTheDocument();
-    expect(screen.queryByText(/is a mock/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/not scored/i)).not.toBeInTheDocument();
   });
 
-  it("shows the mock note (not the real note) when defect_source is mock", () => {
+  it.each<[NotScoredReason, RegExp]>([
+    ["model_unavailable", /Not scored: the defect model isn't running/],
+    ["model_test_mode", /Not scored: the defect model is running in test mode/],
+    ["image_missing", /Not scored: image not available/],
+  ])("an unscored finding (%s) shows why, with no tier and no scores", (reason, text) => {
+    const unscored: Finding = {
+      id: "f3",
+      location_id: "C-deck-106020",
+      side: "C",
+      image_key: "C-deck-106020",
+      has_closeup: false,
+      status: "not_scored",
+      reason,
+    };
     render(
       <FindingDetail
-        finding={{ ...lowNoCloseup, defect_source: "mock" }}
+        finding={unscored}
         imageMap={imageMap}
         structureId="kw51"
         onClose={() => {}}
       />
     );
-    expect(screen.getByText(/is a mock/i)).toBeInTheDocument();
-    expect(
-      screen.queryByText(/CODEBRIM held-out test set/i)
-    ).not.toBeInTheDocument();
+    expect(screen.getByText(text)).toBeInTheDocument();
+    expect(screen.queryByText(/priority/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Defect scores")).not.toBeInTheDocument();
+    expect(screen.queryByText(/CODEBRIM held-out/i)).not.toBeInTheDocument();
   });
 
   it("calls onClose when the close button is clicked", () => {
@@ -164,10 +184,10 @@ describe("StatsPanel", () => {
     within_budget: true,
   };
   const findings = [
-    { tier: "high" },
-    { tier: "medium" },
-    { tier: "low" },
-    { tier: "low" },
+    { status: "scored", tier: "high" },
+    { status: "scored", tier: "medium" },
+    { status: "scored", tier: "low" },
+    { status: "scored", tier: "low" },
   ] as Finding[];
 
   it("shows connections visited, a findings tier summary, and route length", () => {
@@ -178,6 +198,30 @@ describe("StatsPanel", () => {
       screen.getByText("1 high, 1 medium, 2 low (4 imaged for demonstration)")
     ).toBeInTheDocument();
     expect(screen.getByText("399.8 m")).toBeInTheDocument();
+  });
+
+  it("counts only scored findings and says how many were not scored", () => {
+    const mixed = [
+      { status: "scored", tier: "high" },
+      { status: "not_scored", reason: "model_unavailable" },
+      { status: "not_scored", reason: "image_missing" },
+      { status: "not_scored", reason: "model_unavailable" },
+    ] as Finding[];
+    render(<StatsPanel stats={stats} findings={mixed} />);
+    expect(
+      screen.getByText("1 high (4 imaged for demonstration; 3 not scored)")
+    ).toBeInTheDocument();
+  });
+
+  it("never reports a tier when no finding was scored", () => {
+    const none = [
+      { status: "not_scored", reason: "model_test_mode" },
+      { status: "not_scored", reason: "model_test_mode" },
+    ] as Finding[];
+    render(<StatsPanel stats={stats} findings={none} />);
+    expect(
+      screen.getByText("none scored (2 imaged for demonstration; 2 not scored)")
+    ).toBeInTheDocument();
   });
 
   it("does not show any battery figure", () => {
@@ -196,6 +240,7 @@ describe("ImagedStrip", () => {
       id: "f1",
       location_id: "A-deck-105020",
       side: "A",
+      status: "scored",
       tier: "high",
       scores: {
         crack: 0.2,
@@ -207,7 +252,6 @@ describe("ImagedStrip", () => {
       detected: ["spallation", "exposed_bars"],
       image_key: "A-deck-105020",
       has_closeup: true,
-      defect_source: "predict",
     },
   ] as Finding[];
 
@@ -245,6 +289,37 @@ describe("ImagedStrip", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /finding at connection A-deck-105020/i }));
     expect(onSelect).toHaveBeenCalledWith("f1");
+  });
+
+  it("shows an unscored card with its reason, no tier chip, no scores, and the count", () => {
+    const withUnscored: Finding[] = [
+      ...findings,
+      {
+        id: "f2",
+        location_id: "C-deck-106020",
+        side: "C",
+        image_key: "C-deck-106020",
+        has_closeup: false,
+        status: "not_scored",
+        reason: "model_unavailable",
+      },
+    ];
+    render(
+      <ImagedStrip
+        findings={withUnscored}
+        imageMap={imageMap}
+        structureId="kw51"
+        selectedFindingId={null}
+        onSelect={() => {}}
+      />
+    );
+    expect(screen.getByText("Imaged connections (2)")).toBeInTheDocument();
+    expect(screen.getByText("1 scored, 1 not scored.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Not scored: the defect model isn't running")
+    ).toBeInTheDocument();
+    // Only the scored card has a tier chip.
+    expect(screen.getAllByText(/^\([HML]\) /)).toHaveLength(1);
   });
 });
 

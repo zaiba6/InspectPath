@@ -7,11 +7,10 @@ import type {
   MetricStructure,
 } from "../../data/types";
 import { useViewState } from "../../app/viewState";
+import { isScored } from "../../data/tiers";
 import { buildRuleBasedReport } from "./ruleBasedReport";
 import { isBackendReachable } from "./llmClient";
 import { useReport } from "./useReport";
-
-const STRUCTURE_ID = "kw51";
 
 // Builds the inspection report. The default path is a deterministic,
 // rule-based summary built entirely from the data (no LLM, no network).
@@ -34,10 +33,11 @@ export default function ReportPanel() {
     let active = true;
     const src = getDataSource();
     getInspectionData().then((d) => {
-      if (active) setStructure(d.structure);
-    });
-    src.getFindings(STRUCTURE_ID).then((f) => {
-      if (active) setFindings(f);
+      if (!active) return;
+      setStructure(d.structure);
+      src.getFindings(d.structure).then((f) => {
+        if (active) setFindings(f);
+      });
     });
     isBackendReachable().then((ok) => {
       if (active) setAiAvailable(ok);
@@ -129,7 +129,7 @@ export default function ReportPanel() {
           {aiAvailable && (
             <button
               className="replay-btn"
-              onClick={() => runAi(findings, alertHistory)}
+              onClick={() => runAi(findings.filter(isScored), alertHistory)}
               disabled={aiStatus === "loading"}
             >
               {aiStatus === "loading" ? "Generating…" : "AI summary"}

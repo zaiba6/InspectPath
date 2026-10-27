@@ -1,6 +1,12 @@
 import { useRef, useState } from "react";
 import type { Finding, ImageMap } from "../../data/types";
-import { TIER_COLOR, TIER_LABEL, tierChipText } from "../../data/tiers";
+import {
+  NOT_SCORED_TEXT,
+  TIER_COLOR,
+  TIER_LABEL,
+  isScored,
+  tierChipText,
+} from "../../data/tiers";
 import { resolveImageUrl } from "../../data/activeSource";
 import ImageOverlay from "./ImageOverlay";
 
@@ -69,9 +75,13 @@ export default function FindingDetail({
     ? resolveImageUrl(images[`${finding.image_key}_closeup`])
     : undefined;
 
-  const tierColor = TIER_COLOR[finding.tier] ?? "var(--muted)";
-
-  const scoreRows = Object.entries(finding.scores).sort((a, b) => b[1] - a[1]);
+  const scored = isScored(finding) ? finding : null;
+  const tierColor = scored ? TIER_COLOR[scored.tier] ?? "var(--muted)" : undefined;
+  const scoreRows = scored
+    ? Object.entries(scored.scores).sort((a, b) => b[1] - a[1])
+    : [];
+  // Image alt text names the tier only when there is one.
+  const altSuffix = scored ? `, ${TIER_LABEL[scored.tier]} priority` : ", not scored";
 
   return (
     <section className="finding-detail">
@@ -82,26 +92,24 @@ export default function FindingDetail({
         </button>
       </div>
 
-      <div
-        className={`finding-tier finding-tier-${finding.tier}`}
-        style={{ color: tierColor }}
-      >
-        {tierChipText(finding.tier)} priority
-      </div>
-
-      {finding.defect_source === "mock" && (
-        <p className="finding-mock-note">
-          Defect result is a mock (the defect model was unavailable for this
-          capture).
-        </p>
-      )}
-
-      {finding.defect_source === "predict" && (
-        <p className="finding-real-note">
-          Real model scores on representative concrete images from the CODEBRIM
-          held-out test set; not photographs of KW51. Defect images are placed at
-          chosen connections for demonstration; their locations are not
-          detections.
+      {scored ? (
+        <>
+          <div
+            className={`finding-tier finding-tier-${scored.tier}`}
+            style={{ color: tierColor }}
+          >
+            {tierChipText(scored.tier)} priority
+          </div>
+          <p className="finding-real-note">
+            Real model scores on representative concrete images from the CODEBRIM
+            held-out test set; not photographs of KW51. Defect images are placed at
+            chosen connections for demonstration; their locations are not
+            detections.
+          </p>
+        </>
+      ) : (
+        <p className="finding-not-scored">
+          {finding.status === "not_scored" && NOT_SCORED_TEXT[finding.reason]}
         </p>
       )}
 
@@ -109,7 +117,7 @@ export default function FindingDetail({
         <figure>
           <ZoomableImage
             src={fullSrc}
-            alt={`Capture at connection ${finding.location_id}, ${TIER_LABEL[finding.tier]} priority`}
+            alt={`Capture at connection ${finding.location_id}${altSuffix}`}
           />
           <figcaption className="muted">Capture</figcaption>
         </figure>
@@ -117,28 +125,30 @@ export default function FindingDetail({
           <figure>
             <ZoomableImage
               src={closeupSrc}
-              alt={`Close-up at connection ${finding.location_id}, ${TIER_LABEL[finding.tier]} priority`}
+              alt={`Close-up at connection ${finding.location_id}${altSuffix}`}
             />
             <figcaption className="muted">Close-up</figcaption>
           </figure>
         )}
       </div>
 
-      <div className="finding-scores">
-        <span className="muted score-head">Defect scores</span>
-        {scoreRows.map(([cls, score]) => (
-          <div className="score-row" key={cls}>
-            <span className="score-label">{CLASS_LABELS[cls] ?? cls}</span>
-            <div className="score-bar">
-              <div
-                className="score-fill"
-                style={{ width: `${Math.round(score * 100)}%` }}
-              />
+      {scored && (
+        <div className="finding-scores">
+          <span className="muted score-head">Defect scores</span>
+          {scoreRows.map(([cls, score]) => (
+            <div className="score-row" key={cls}>
+              <span className="score-label">{CLASS_LABELS[cls] ?? cls}</span>
+              <div className="score-bar">
+                <div
+                  className="score-fill"
+                  style={{ width: `${Math.round(score * 100)}%` }}
+                />
+              </div>
+              <span className="score-num">{score.toFixed(2)}</span>
             </div>
-            <span className="score-num">{score.toFixed(2)}</span>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

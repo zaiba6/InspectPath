@@ -146,22 +146,41 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
-// Contract §1: POST /predict takes an image file or base64 image — NOT a path.
-// We fetch the image from the served data/ path, then send it as base64 JSON
-// ({ image_base64 }), which Zaiba's API accepts. Returns null on any failure so
-// the caller can fall back to the mock result for that waypoint.
-async function predict(imagePath: string): Promise<PredictResponse | null> {
+// Fetch an image from the served data/ path as base64, or null when it is not
+// served. Guards against the Vite SPA fallback (HTML) for a missing image.
+async function fetchImageBase64(imagePath: string): Promise<string | null> {
   try {
-    // 1. Fetch the image bytes from /data/<path>.
     const imgRes = await fetch(`${DATA_BASE}/${imagePath.replace(/^\/+/, "")}`);
     if (!imgRes.ok) return null;
     const contentType = imgRes.headers.get("content-type") ?? "";
-    // Guard against the Vite SPA fallback (HTML) when the image is missing.
     if (!contentType.startsWith("image/")) return null;
-    const blob = await imgRes.blob();
-    const imageBase64 = await blobToBase64(blob);
+    return await blobToBase64(await imgRes.blob());
+  } catch {
+    return null;
+  }
+}
 
-    // 2. Send it to the defect model as base64.
+// The defect API's /health says whether it is up and whether it is in test
+// mode ("mock": true = deterministic fake scores, which are never shown).
+type ModelState = "ready" | "model_unavailable" | "model_test_mode";
+
+async function defectModelState(): Promise<ModelState> {
+  try {
+    const res = await fetch(`${PREDICT_URL}/health`, { method: "GET" });
+    if (!res.ok) return "model_unavailable";
+    const data = await res.json();
+    if (data && data.mock === true) return "model_test_mode";
+    return "ready";
+  } catch {
+    return "model_unavailable";
+  }
+}
+
+// Contract §1: POST /predict takes an image file or base64 image — NOT a path.
+// We send base64 JSON ({ image_base64 }), which Zaiba's API accepts. Returns
+// null on any failure; the finding is then shown as not scored.
+async function predict(imageBase64: string): Promise<PredictResponse | null> {
+  try {
     const res = await fetch(`${PREDICT_URL}/predict`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -178,46 +197,61 @@ async function predict(imagePath: string): Promise<PredictResponse | null> {
   }
 }
 
-async function getFindings(structureId: string): Promise<Finding[]> {
+// The imaged connections are the keys of the real image map for this structure
+// (each "<location_id>" with an optional "<location_id>_closeup"). Each one is
+// scored by the real defect model, or marked not scored with the reason.
+async function getFindings(structure: MetricStructure): Promise<Finding[]> {
   const imageMap = await getImageMap();
-  const images = imageMap[structureId] ?? {};
+  const images = imageMap[structure.id] ?? {};
+  const locById = new Map(
+    structure.diagonal_connections.distinct_locations.map((l) => [l.location_id, l])
+  );
 
-  // Findings are simulated, so the set of inspected locations comes from the
-  // mock findings (which are keyed to real KW51 connection locations). For each,
-  // try the real defect model on its image; fall back to the mock score if the
-  // model is unavailable, marking the result as mock.
-  const mockFindings = await mockSource.getFindings(structureId);
-  if (mockFindings.length === 0) return mockFindings;
-
-  const findings: Finding[] = [];
-  let usedMockFallback = false;
-
-  for (const mf of mockFindings) {
-    const imagePath = images[mf.image_key];
-    const result = imagePath ? await predict(imagePath) : null;
-
-    if (result) {
-      const tier = result.tier ?? tierFromDetected(result.detected);
-      findings.push({
-        ...mf,
-        tier,
-        scores: result.scores,
-        detected: result.detected,
-        has_closeup: Boolean(images[`${mf.image_key}_closeup`]),
-        defect_source: "predict",
-      });
-    } else {
-      usedMockFallback = true;
-      findings.push({ ...mf, defect_source: "mock" });
-    }
-  }
-
-  if (usedMockFallback) {
+  const keys = Object.keys(images).filter((k) => !k.endsWith("_closeup"));
+  const unknown = keys.filter((k) => !locById.has(k));
+  if (unknown.length > 0) {
     addWarning({
       piece: "defects",
       message:
-        "Defect model unavailable for one or more locations. Mock results used " +
-        "(marked 'mock' in pin detail).",
+        `image_map.json lists ${unknown.length} key(s) that are not connections ` +
+        `in the layout (e.g. ${unknown[0]}); those images are not shown.`,
+    });
+  }
+  const located = keys.filter((k) => locById.has(k));
+  if (located.length === 0) return [];
+
+  const modelState = await defectModelState();
+  const findings: Finding[] = [];
+
+  for (const key of located) {
+    const base = {
+      id: `f-${key}`,
+      location_id: key,
+      side: locById.get(key)!.side,
+      image_key: key,
+      has_closeup: Boolean(images[`${key}_closeup`]),
+    };
+
+    const imageBase64 = await fetchImageBase64(images[key]);
+    if (imageBase64 === null) {
+      findings.push({ ...base, status: "not_scored", reason: "image_missing" });
+      continue;
+    }
+    if (modelState !== "ready") {
+      findings.push({ ...base, status: "not_scored", reason: modelState });
+      continue;
+    }
+    const result = await predict(imageBase64);
+    if (!result) {
+      findings.push({ ...base, status: "not_scored", reason: "model_unavailable" });
+      continue;
+    }
+    findings.push({
+      ...base,
+      status: "scored",
+      tier: result.tier ?? tierFromDetected(result.detected),
+      scores: result.scores,
+      detected: result.detected,
     });
   }
 

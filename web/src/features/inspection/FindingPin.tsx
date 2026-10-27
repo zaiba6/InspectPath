@@ -1,4 +1,4 @@
-import type { Finding, DefectTier } from "../../data/types";
+import type { ScoredFinding, DefectTier } from "../../data/types";
 import { TIER_COLOR, TIER_LABEL } from "../../data/tiers";
 
 // Letter per tier so a pin never relies on color alone.
@@ -9,9 +9,10 @@ const TIER_LETTER: Record<DefectTier, string> = {
   none: "",
 };
 
-// A map pin for a single simulated finding, colored by tier AND marked with a
-// letter. Positioned at the screen px/py of its connection stop (computed by
-// the caller from the metric geometry). Clicking selects it.
+// A map pin for a single scored finding, colored by tier AND marked with a
+// letter. Unscored findings are never pinned (they have no tier). Positioned at
+// the screen px/py of its connection stop (computed by the caller from the
+// metric geometry). Clicking selects it.
 export default function FindingPin({
   finding,
   cx,
@@ -20,7 +21,7 @@ export default function FindingPin({
   selected,
   onSelect,
 }: {
-  finding: Finding;
+  finding: ScoredFinding;
   cx: number;
   cy: number;
   r: number;

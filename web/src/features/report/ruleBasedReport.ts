@@ -7,8 +7,10 @@ import type {
   InspectionReport,
   MetricPlanStats,
   MetricStructure,
+  NotScoredReason,
+  ScoredFinding,
 } from "../../data/types";
-import { findingsSummaryText } from "../../data/tiers";
+import { findingsSummaryText, isScored } from "../../data/tiers";
 
 export interface RuleBasedReportInput {
   structure: MetricStructure;
@@ -53,13 +55,20 @@ const TIER_ACTION: Record<Exclude<DefectTier, "none">, string> = {
   low: "Log and monitor.",
 };
 
+// Report wording for why an imaged connection has no defect result.
+const NOT_SCORED_REASON: Record<NotScoredReason, string> = {
+  model_unavailable: "the defect model isn't running",
+  model_test_mode: "the defect model is running in test mode",
+  image_missing: "image not available",
+};
+
 function pct(v: number): string {
   // v is a 0..1 fraction from the contract stats.
   return `${Math.round(v * 100)}%`;
 }
 
 // Highest defect score for a finding, with its class label.
-function topScore(finding: Finding): { label: string; value: number } {
+function topScore(finding: ScoredFinding): { label: string; value: number } {
   let bestClass: keyof DefectScores = "crack";
   let best = -Infinity;
   (Object.keys(finding.scores) as (keyof DefectScores)[]).forEach((k) => {
@@ -94,8 +103,11 @@ export function buildRuleBasedReport(
   const { structure, stats, findings, alertHistory } = input;
   const lines: string[] = [];
 
-  // 1. Summary
+  // 1. Summary. Only scored findings are assessed; unscored ones are counted
+  // and named but never given a tier.
   const imagedCount = findings.length;
+  const scored = findings.filter(isScored);
+  const unscored = findings.filter((f) => !isScored(f));
   lines.push(`Inspection report — ${structure.name}`);
   lines.push("");
   lines.push("Summary");
@@ -105,6 +117,13 @@ export function buildRuleBasedReport(
       `${imagedCount} imaged for demonstration, the rest have no image.`
   );
   lines.push(`- Findings: ${findingsSummaryText(findings)}`);
+  for (const f of unscored) {
+    if (f.status !== "not_scored") continue;
+    lines.push(
+      `- Not scored: connection ${f.location_id} (side ${f.side}), ` +
+        `${NOT_SCORED_REASON[f.reason]}.`
+    );
+  }
   lines.push(
     `- Route length: ${stats.route_length_m} m ` +
       `(straight-line 3D estimate, ignores obstacles)`
@@ -119,8 +138,9 @@ export function buildRuleBasedReport(
     lines.push(
       "- The frequency shift is a global measurement and does not identify a " +
         "location, so the route visits all connection locations. Only the " +
-        `${imagedCount} imaged connections below were assessed; the rest were ` +
-        "not imaged and are neither assessed nor cleared."
+        `${scored.length} scored connection${scored.length === 1 ? "" : "s"} ` +
+        `below ${scored.length === 1 ? "was" : "were"} assessed; the rest were ` +
+        "not imaged or not scored and are neither assessed nor cleared."
     );
   } else {
     lines.push("- Highest alert level reached: none recorded");
@@ -131,7 +151,7 @@ export function buildRuleBasedReport(
   lines.push("Findings by priority");
   let anyFindings = false;
   for (const tier of TIER_ORDER) {
-    const group = findings.filter((f) => f.tier === tier);
+    const group = scored.filter((f) => f.tier === tier);
     if (group.length === 0) continue;
     anyFindings = true;
     lines.push("");
@@ -158,7 +178,7 @@ export function buildRuleBasedReport(
   lines.push("");
   lines.push("Recommended actions");
   const tiersPresent = TIER_ORDER.filter((t) =>
-    findings.some((f) => f.tier === t)
+    scored.some((f) => f.tier === t)
   );
   if (tiersPresent.length === 0) {
     lines.push("- No actions required.");

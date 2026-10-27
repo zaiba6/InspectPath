@@ -43,8 +43,8 @@ export const mockSource: DataSource = {
     return imageMap as ImageMap;
   },
 
-  async getFindings(structureId: string): Promise<Finding[]> {
-    void structureId;
+  async getFindings(structure: MetricStructure): Promise<Finding[]> {
+    void structure;
     return findings as Finding[];
   },
 

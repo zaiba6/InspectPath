@@ -74,12 +74,17 @@ describe("rule-based report — summary numbers", () => {
   // connections, but only the imaged ones are assessed; the rest are not
   // cleared. Reason: the old wording "all connection locations were inspected"
   // implied the un-imaged connections were assessed.
-  it("states the shift is global and that only imaged connections were assessed", () => {
+  // Changed: "Only the N imaged connections" -> "Only the N scored connections",
+  // and "the rest were not imaged" -> "not imaged or not scored". Reason (no
+  // mock data): an imaged connection the model did not score has no result, so
+  // it is not assessed either.
+  it("states the shift is global and that only scored connections were assessed", () => {
     expect(report.text).toContain(
       "frequency shift is a global measurement and does not identify a location"
     );
+    expect(report.text).toContain("Only the 4 scored connections below were assessed");
     expect(report.text).toContain(
-      "the rest were not imaged and are neither assessed nor cleared"
+      "the rest were not imaged or not scored and are neither assessed nor cleared"
     );
     expect(report.text).not.toContain("so all connection locations were inspected");
   });
@@ -131,6 +136,48 @@ describe("rule-based report — actions and limitations", () => {
   it("explicitly states it does not judge whether the bridge is safe or unsafe", () => {
     expect(report.text).toContain(
       "does not state whether the bridge is safe or unsafe"
+    );
+  });
+});
+
+describe("rule-based report — unscored findings", () => {
+  // The high finding is scored; the other three were not scored. They must be
+  // counted and named, but never given a tier or an action.
+  const all = findingsMock as unknown as Finding[];
+  const findings: Finding[] = [
+    all[0],
+    ...all.slice(1).map(
+      (f): Finding => ({
+        id: f.id,
+        location_id: f.location_id,
+        side: f.side,
+        image_key: f.image_key,
+        has_closeup: f.has_closeup,
+        status: "not_scored",
+        reason: "model_unavailable",
+      })
+    ),
+  ];
+  const report = buildRuleBasedReport({
+    structure: structure as unknown as MetricStructure,
+    stats: (planOptimized as unknown as MetricPlan).stats,
+    findings,
+    alertHistory,
+  });
+
+  it("counts only scored findings in the tiers and says how many were not scored", () => {
+    expect(report.text).toContain(
+      "Findings: 1 high (4 imaged for demonstration; 3 not scored)"
+    );
+    expect(report.text).toContain("High priority (1):");
+    expect(report.text).not.toContain("Medium priority");
+    expect(report.text).not.toContain("Low priority");
+    expect(report.text).toContain("Only the 1 scored connection below was assessed");
+  });
+
+  it("names each unscored connection with the reason", () => {
+    expect(report.text).toContain(
+      `Not scored: connection ${all[1].location_id} (side ${all[1].side}), the defect model isn't running.`
     );
   });
 });

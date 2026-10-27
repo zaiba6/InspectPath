@@ -149,21 +149,36 @@ export type DefectTier = "high" | "medium" | "low" | "none";
 // ---- Dashboard-internal shapes (NOT part of the shared contract) ----
 
 // [dashboard-internal] joins a map location to a captured image and its defect result.
-// Positioned on the metric elevation by location_id/side; the geometry is real
-// but the defect result itself is simulated (see defect_source).
-export interface Finding {
+// Positioned on the metric elevation by location_id/side. A finding is either
+// scored by the real defect model, or not scored (with the reason); there is no
+// mock or substitute result.
+interface FindingBase {
   id: string;
   location_id: string; // references MetricStop.location_id [contract §4b]
-  side: BridgeSide; // which elevation the pin belongs on
+  side: BridgeSide; // which elevation the finding belongs on
+  image_key: string; // key into ImageMap[structureId] [contract §5]
+  has_closeup: boolean; // whether "<image_key>_closeup" exists [contract §5]
+}
+
+export interface ScoredFinding extends FindingBase {
+  status: "scored";
   tier: DefectTier; // value set per [contract §1]
   scores: DefectScores; // field set per [contract §1]
   detected: string[]; // per [contract §1]
-  image_key: string; // key into ImageMap[structureId] [contract §5]
-  has_closeup: boolean; // whether "<image_key>_closeup" exists [contract §5]
-  // [dashboard-internal] provenance of the defect result for this finding.
-  // "mock" when the live /predict call failed and a mock result was substituted.
-  defect_source?: "predict" | "mock";
 }
+
+// Why a finding has no defect result.
+//   model_unavailable: /health or /predict could not be reached or failed
+//   model_test_mode:   /health reports "mock": true (fake scores, not shown)
+//   image_missing:     the image file is not served
+export type NotScoredReason = "model_unavailable" | "model_test_mode" | "image_missing";
+
+export interface UnscoredFinding extends FindingBase {
+  status: "not_scored";
+  reason: NotScoredReason;
+}
+
+export type Finding = ScoredFinding | UnscoredFinding;
 
 // [dashboard-internal] accumulated alert transitions observed during replay
 export interface AlertHistoryEntry {

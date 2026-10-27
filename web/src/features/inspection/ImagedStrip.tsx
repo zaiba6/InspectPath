@@ -1,6 +1,12 @@
 import { useRef, useState } from "react";
-import type { Finding, ImageMap } from "../../data/types";
-import { TIER_COLOR, TIER_LABEL, tierChipText } from "../../data/tiers";
+import type { DefectTier, Finding, ImageMap, ScoredFinding } from "../../data/types";
+import {
+  NOT_SCORED_TEXT,
+  TIER_COLOR,
+  TIER_LABEL,
+  isScored,
+  tierChipText,
+} from "../../data/tiers";
 import { resolveImageUrl } from "../../data/activeSource";
 import ImageOverlay from "./ImageOverlay";
 
@@ -14,7 +20,7 @@ const CLASS_LABELS: Record<string, string> = {
 
 // Top 1-2 scored classes as plain text (never color-alone), e.g.
 // "spallation 0.98, exposed bars 0.66".
-function topScores(finding: Finding, n = 2): string {
+function topScores(finding: ScoredFinding, n = 2): string {
   return Object.entries(finding.scores)
     .sort((a, b) => b[1] - a[1])
     .slice(0, n)
@@ -22,7 +28,12 @@ function topScores(finding: Finding, n = 2): string {
     .join(", ");
 }
 
-function TierChip({ tier }: { tier: Finding["tier"] }) {
+// Accessible description of a finding's result: its tier, or that it is unscored.
+function resultLabel(f: Finding): string {
+  return isScored(f) ? `${TIER_LABEL[f.tier]} priority` : "not scored";
+}
+
+function TierChip({ tier }: { tier: DefectTier }) {
   const color = TIER_COLOR[tier];
   if (!color) return null;
   const isLow = tier === "low";
@@ -41,8 +52,8 @@ function TierChip({ tier }: { tier: Finding["tier"] }) {
 }
 
 // A persistent, always-visible strip of the imaged connections. Each card shows
-// the capture image, the connection id + side, the tier (letter + word), the top
-// scores, and whether the result is real or a mock fallback. Clicking the card
+// the capture image, the connection id + side, and either the tier (letter +
+// word) with the top scores, or why it was not scored. Clicking the card
 // body selects that finding (same selection the pins drive); clicking the
 // thumbnail opens the image enlarged in an overlay. The honesty label is shown
 // ONCE in the header, not per card.
@@ -65,7 +76,8 @@ export default function ImagedStrip({
 
   if (findings.length === 0) return null;
   const images = imageMap[structureId] ?? {};
-  const anyReal = findings.some((f) => f.defect_source === "predict");
+  const scoredCount = findings.filter(isScored).length;
+  const unscoredCount = findings.length - scoredCount;
 
   const zoomed = findings.find((f) => f.id === zoomedId) ?? null;
   const zoomedSrc = zoomed
@@ -76,10 +88,15 @@ export default function ImagedStrip({
     <section className="imaged-strip" aria-label="Imaged connections">
       <div className="imaged-strip-head">
         <h3 className="stats-title">Imaged connections ({findings.length})</h3>
+        {unscoredCount > 0 && (
+          <p className="stat-note">
+            {scoredCount} scored, {unscoredCount} not scored.
+          </p>
+        )}
         <p className="stat-note muted">
-          {anyReal
+          {scoredCount > 0
             ? "Real model scores on CODEBRIM held-out concrete images, placed at chosen connections for demonstration; not photographs of KW51 and not detections. Only these connections are imaged; the rest of the 34 are not assessed."
-            : "Simulated defect results for demonstration. Only these connections are imaged; the rest of the 34 are not assessed."}
+            : "No defect results are shown because none of these images were scored. Only these connections are imaged; the rest of the 34 are not assessed."}
         </p>
       </div>
 
@@ -87,7 +104,7 @@ export default function ImagedStrip({
         {findings.map((f) => {
           const src = resolveImageUrl(images[f.image_key]);
           const selected = f.id === selectedFindingId;
-          const imgAlt = `Defect image at connection ${f.location_id}, ${TIER_LABEL[f.tier]} priority`;
+          const imgAlt = `Defect image at connection ${f.location_id}, ${resultLabel(f)}`;
           return (
             <li key={f.id}>
               <div className={"imaged-card" + (selected ? " selected" : "")}>
@@ -111,18 +128,23 @@ export default function ImagedStrip({
                   className="imaged-card-body"
                   onClick={() => onSelect(f.id)}
                   aria-pressed={selected}
-                  aria-label={`${TIER_LABEL[f.tier]} finding at connection ${f.location_id}, side ${f.side}`}
+                  aria-label={`${isScored(f) ? TIER_LABEL[f.tier] : "Not scored"} finding at connection ${f.location_id}, side ${f.side}`}
                 >
-                  <span className="imaged-card-row">
-                    <TierChip tier={f.tier} />
-                    {f.defect_source === "mock" && (
-                      <span className="imaged-mock-tag">mock</span>
-                    )}
-                  </span>
+                  {isScored(f) && (
+                    <span className="imaged-card-row">
+                      <TierChip tier={f.tier} />
+                    </span>
+                  )}
                   <span className="imaged-card-id">
                     {f.location_id} · side {f.side}
                   </span>
-                  <span className="imaged-card-scores muted">{topScores(f)}</span>
+                  {isScored(f) ? (
+                    <span className="imaged-card-scores muted">{topScores(f)}</span>
+                  ) : (
+                    <span className="imaged-card-not-scored">
+                      {NOT_SCORED_TEXT[f.reason]}
+                    </span>
+                  )}
                 </button>
               </div>
             </li>
@@ -133,7 +155,7 @@ export default function ImagedStrip({
       {zoomed && zoomedSrc && (
         <ImageOverlay
           src={zoomedSrc}
-          alt={`Defect image at connection ${zoomed.location_id}, ${TIER_LABEL[zoomed.tier]} priority`}
+          alt={`Defect image at connection ${zoomed.location_id}, ${resultLabel(zoomed)}`}
           onClose={() => setZoomedId(null)}
           returnFocusRef={{ current: thumbRefs.current[zoomed.id] ?? null }}
         />

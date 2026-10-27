@@ -19,6 +19,6 @@ export interface DataSource {
   getMetricStructure(): Promise<MetricStructure>; // [contract §3b]
   getMetricPlan(type: PlanType): Promise<MetricPlan>; // [contract §4b]
   getImageMap(): Promise<ImageMap>; // [contract §5]
-  getFindings(structureId: string): Promise<Finding[]>; // [dashboard-internal]
+  getFindings(structure: MetricStructure): Promise<Finding[]>; // [dashboard-internal]
   getDemoReport(): Promise<InspectionReport>; // [dashboard-internal]
 }

@@ -8,6 +8,7 @@ import type {
   MetricStructure,
   PlanType,
 } from "../../data/types";
+import { isScored } from "../../data/tiers";
 import { useViewState } from "../../app/viewState";
 import ElevationMap from "./ElevationMap";
 import SideToggle from "./SideToggle";
@@ -61,9 +62,9 @@ export default function InspectionView() {
       setPlans(d.plans);
       setIsSample(d.isSample);
       setLoading(false);
-    });
-    src.getFindings(STRUCTURE_ID).then((f) => {
-      if (active) setFindings(f);
+      src.getFindings(d.structure).then((f) => {
+        if (active) setFindings(f);
+      });
     });
     src.getImageMap().then((m) => {
       if (active) setImageMap(m);
@@ -140,11 +141,14 @@ export default function InspectionView() {
   }
 
   // Finding pins on the displayed side, positioned at their connection stop.
-  const sideFindings = findings.filter((f) => f.side === selectedSide);
+  // Only scored findings are pinned; unscored ones appear in the strip and stats.
+  const sideFindings = findings
+    .filter(isScored)
+    .filter((f) => f.side === selectedSide);
 
-  // Whether any finding carries real model scores (vs. all mock). Drives the
-  // honest caption wording about where the defect scores/images come from.
-  const anyRealScores = findings.some((f) => f.defect_source === "predict");
+  // Whether any finding was scored by the real model. Drives the honest caption
+  // wording about where the defect scores/images come from.
+  const anyRealScores = findings.some(isScored);
 
   const selectedFinding =
     findings.find((f) => f.id === selectedFindingId) ?? null;
