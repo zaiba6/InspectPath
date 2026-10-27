@@ -16,14 +16,11 @@ export function useReport() {
       const result = await generateReport({ findings, alertHistory });
       setReport(result);
       setStatus("done");
-      if (result.source === "mock") {
-        setNotice(
-          "Showing a sample report. Start the InspectPath API with a configured key for a live summary."
-        );
-      }
-    } catch {
+    } catch (e) {
+      // No sample report: say what failed. The rule-based report is unaffected.
       setStatus("error");
-      setNotice("Could not generate a report. Please try again.");
+      const reason = e instanceof Error ? e.message : String(e);
+      setNotice(`AI summary failed: ${reason}. The rule-based report is unaffected.`);
     }
   }
 

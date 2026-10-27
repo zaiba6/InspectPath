@@ -3,7 +3,6 @@ import type {
   PlanType,
   ImageMap,
   Finding,
-  InspectionReport,
   MetricStructure,
   MetricPlan,
 } from "./types";
@@ -20,5 +19,4 @@ export interface DataSource {
   getMetricPlan(type: PlanType): Promise<MetricPlan>; // [contract §4b]
   getImageMap(): Promise<ImageMap>; // [contract §5]
   getFindings(structure: MetricStructure): Promise<Finding[]>; // [dashboard-internal]
-  getDemoReport(): Promise<InspectionReport>; // [dashboard-internal]
 }

@@ -4,7 +4,6 @@ import type {
   DefectTier,
   Finding,
   ImageMap,
-  InspectionReport,
   MetricPlan,
   MetricStructure,
   PlanType,
@@ -258,10 +257,6 @@ async function getFindings(structure: MetricStructure): Promise<Finding[]> {
   return findings;
 }
 
-async function getDemoReport(): Promise<InspectionReport> {
-  return mockSource.getDemoReport();
-}
-
 export const realSource: DataSource = {
   isMock: false,
   getReplay,
@@ -269,5 +264,4 @@ export const realSource: DataSource = {
   getMetricPlan,
   getImageMap,
   getFindings,
-  getDemoReport,
 };

@@ -413,20 +413,21 @@ describe("report generation", () => {
     vi.restoreAllMocks();
   });
 
-  it("falls back to the mock report when the API endpoint is unavailable", async () => {
-    // Simulate the backend being down / unreachable.
+  // Changed from "falls back to the mock report". Reason (no mock data): a
+  // failed AI summary is reported as an error, never replaced by a sample.
+  it("rejects with a clear reason (no sample report) when the API is unreachable", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network down"));
-    const report = await generateReport({ findings: [], alertHistory: [] });
-    expect(report.source).toBe("mock");
-    expect(report.text.length).toBeGreaterThan(0);
+    await expect(
+      generateReport({ findings: [], alertHistory: [] })
+    ).rejects.toThrow(/could not be reached/);
   });
 
-  it("falls back to the mock report when the API returns an error status", async () => {
+  it("rejects with the HTTP status (no sample report) when the API returns an error", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response("", { status: 503 })
     );
-    const report = await generateReport({ findings: [], alertHistory: [] });
-    expect(report.source).toBe("mock");
-    expect(report.text.length).toBeGreaterThan(0);
+    await expect(
+      generateReport({ findings: [], alertHistory: [] })
+    ).rejects.toThrow(/HTTP 503/);
   });
 });

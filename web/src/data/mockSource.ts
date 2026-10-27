@@ -4,7 +4,6 @@ import type {
   PlanType,
   ImageMap,
   Finding,
-  InspectionReport,
   MetricStructure,
   MetricPlan,
 } from "./types";
@@ -15,7 +14,6 @@ import planKw51NaiveSample from "../mocks/plan_kw51_naive_sample.json";
 import planKw51OptimizedSample from "../mocks/plan_kw51_optimized_sample.json";
 import imageMap from "../mocks/image_map.json";
 import findings from "../mocks/findings.json";
-import reportDemo from "../mocks/report_demo.json";
 
 // Mock implementation of DataSource, backed by files in src/mocks/.
 // Field names match docs/contract.md so the same files would validate
@@ -46,9 +44,5 @@ export const mockSource: DataSource = {
   async getFindings(structure: MetricStructure): Promise<Finding[]> {
     void structure;
     return findings as Finding[];
-  },
-
-  async getDemoReport(): Promise<InspectionReport> {
-    return reportDemo as InspectionReport;
   },
 };

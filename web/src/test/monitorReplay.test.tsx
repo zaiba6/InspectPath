@@ -24,7 +24,6 @@ function stubSource(records: TriggerRecord[]): DataSource {
     },
     getImageMap: async () => ({}),
     getFindings: async () => [],
-    getDemoReport: async () => ({ text: "", generatedAt: "", source: "rule-based" }),
   } as unknown as DataSource;
 }
 

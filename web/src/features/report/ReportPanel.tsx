@@ -25,7 +25,7 @@ export default function ReportPanel() {
   const [copied, setCopied] = useState(false);
   const [aiAvailable, setAiAvailable] = useState(false);
 
-  // AI path (optional) reuses the existing backend client + mock fallback.
+  // AI path (optional): the backend client; on failure it reports an error.
   const { report: aiReport, status: aiStatus, notice: aiNotice, run: runAi } =
     useReport();
 
@@ -100,13 +100,8 @@ export default function ReportPanel() {
   // The rule-based report is the authoritative document. An AI summary, when
   // the backend is reachable, is shown separately and clearly labeled so it is
   // never mistaken for the rule-based output.
-  const isAi = report?.source === "llm" || report?.source === "mock";
-  const aiLabel =
-    report?.source === "llm"
-      ? "AI-generated summary"
-      : report?.source === "mock"
-      ? "AI-generated summary (sample)"
-      : "";
+  const isAi = report?.source === "llm";
+  const aiLabel = isAi ? "AI-generated summary" : "";
 
   return (
     <section className="report-panel">
