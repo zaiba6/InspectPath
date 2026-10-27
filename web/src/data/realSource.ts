@@ -9,7 +9,6 @@ import type {
   PlanType,
   TriggerRecord,
 } from "./types";
-import { mockSource } from "./mockSource";
 import {
   validateMetricPlan,
   validateMetricStructure,
@@ -48,11 +47,6 @@ async function loadJson(
   }
 }
 
-async function fetchJson(path: string): Promise<unknown | null> {
-  const r = await loadJson(path);
-  return r.ok ? r.data : null;
-}
-
 // ---- Replay (contract §2) ----
 // A missing or invalid replay is an error naming the file. Nothing is shown in
 // its place.
@@ -69,58 +63,50 @@ async function getReplay(dataset: string): Promise<LoadResult<TriggerRecord[]>> 
 
 // ---- Metric structure (contract §3b) ----
 // Real KW51 geometry. The dashboard reads it; it never computes geometry.
-// The layout file is served at /data/structures/kw51_layout.json.
+// The layout file is served at /data/structures/kw51_layout.json. A missing or
+// invalid layout is an error naming the file; no other geometry is shown.
 
-async function getMetricStructure(): Promise<MetricStructure> {
+async function getMetricStructure(): Promise<LoadResult<MetricStructure>> {
   const fileName = "kw51_layout.json";
-  const raw = await fetchJson(`${DATA_BASE}/structures/${fileName}`);
-  if (raw === null) {
-    // Not present yet: fall back to the metric sample. This is expected before
-    // the geometry is deployed, so warn (it affects what the map shows).
-    addWarning({
-      piece: "structure",
-      message: `${fileName} not found under ${DATA_BASE}/structures/. Using the metric sample.`,
-    });
-    return mockSource.getMetricStructure();
-  }
-  const res = validateMetricStructure(raw, fileName);
-  if (!res.ok) {
-    addWarning({ piece: "structure", message: `${res.error}. Falling back to the metric sample.` });
-    return mockSource.getMetricStructure();
-  }
-  return res.value;
+  const file = `${DATA_BASE}/structures/${fileName}`;
+  const loaded = await loadJson(file);
+  if (!loaded.ok) return { ok: false, file, reason: loaded.reason };
+  const res = validateMetricStructure(loaded.data, fileName);
+  if (!res.ok) return { ok: false, file, reason: res.error };
+  return { ok: true, value: res.value, file };
 }
 
 // ---- Metric plan (contract §4b) ----
 // Produced only by firmware_esp32/planner.py and served as JSON files; the
 // dashboard reads them and never computes a plan.
 
-async function getMetricPlan(type: PlanType): Promise<MetricPlan> {
+async function getMetricPlan(type: PlanType): Promise<LoadResult<MetricPlan>> {
   const fileName = `kw51_${type}.json`;
-  const raw = await fetchJson(`${DATA_BASE}/plans/${fileName}`);
-  if (raw === null) {
-    addWarning({
-      piece: "plan",
-      message: `${fileName} not found under ${DATA_BASE}/plans/. Using the metric sample plan.`,
-    });
-    return mockSource.getMetricPlan(type);
-  }
-  const res = validateMetricPlan(raw, fileName);
-  if (!res.ok) {
-    addWarning({ piece: "plan", message: `${res.error}. Falling back to the metric sample plan.` });
-    return mockSource.getMetricPlan(type);
-  }
-  return res.value;
+  const file = `${DATA_BASE}/plans/${fileName}`;
+  const loaded = await loadJson(file);
+  if (!loaded.ok) return { ok: false, file, reason: loaded.reason };
+  const res = validateMetricPlan(loaded.data, fileName);
+  if (!res.ok) return { ok: false, file, reason: res.error };
+  return { ok: true, value: res.value, file };
 }
 
 // ---- Image map (contract §5) ----
+// If it can't be loaded, no imaged connections are shown, and a warning names
+// the file.
 
 async function getImageMap(): Promise<ImageMap> {
-  const raw = await fetchJson(`${DATA_BASE}/image_map.json`);
-  if (raw === null || typeof raw !== "object") {
-    return mockSource.getImageMap();
+  const file = `${DATA_BASE}/image_map.json`;
+  const loaded = await loadJson(file);
+  if (!loaded.ok || typeof loaded.data !== "object" || loaded.data === null) {
+    addWarning({
+      piece: "defects",
+      message:
+        `${file} couldn't be loaded (${loaded.ok ? "not an object" : loaded.reason}); ` +
+        "no imaged connections are shown.",
+    });
+    return {};
   }
-  return raw as ImageMap;
+  return loaded.data as ImageMap;
 }
 
 // ---- Defects (contract §1) via POST /predict, per capture waypoint ----

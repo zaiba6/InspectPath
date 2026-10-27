@@ -47,7 +47,7 @@ export default function InspectionView() {
 
   const [structure, setStructure] = useState<MetricStructure | null>(null);
   const [plans, setPlans] = useState<Record<PlanType, MetricPlan> | null>(null);
-  const [isSample, setIsSample] = useState(false);
+  const [loadError, setLoadError] = useState<{ file: string; reason: string } | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [imageMap, setImageMap] = useState<ImageMap>({});
   const [loading, setLoading] = useState(true);
@@ -55,13 +55,17 @@ export default function InspectionView() {
   useEffect(() => {
     let active = true;
     const src = getDataSource();
-    // One coherent bundle: structure + both plans, real or sample together.
+    // One coherent bundle: the real structure + both plans, or an error naming
+    // the file that failed. Nothing else is shown in their place.
     getInspectionData().then((d) => {
       if (!active) return;
+      setLoading(false);
+      if (!d.ok) {
+        setLoadError({ file: d.file, reason: d.reason });
+        return;
+      }
       setStructure(d.structure);
       setPlans(d.plans);
-      setIsSample(d.isSample);
-      setLoading(false);
       src.getFindings(d.structure).then((f) => {
         if (active) setFindings(f);
       });
@@ -96,10 +100,32 @@ export default function InspectionView() {
 
   if (loading && !structure)
     return <p className="placeholder">Loading inspection…</p>;
+  if (loadError) {
+    return (
+      <div className="inspection">
+        <div className="inspection-head">
+          <div>
+            <h2 className="view-title">Inspection</h2>
+          </div>
+          <button className="replay-btn" onClick={() => setActiveView("monitor")}>
+            Back to monitor
+          </button>
+        </div>
+        <div className="load-error" role="alert">
+          <p className="load-error-title">
+            Bridge inspection data couldn't be loaded.
+          </p>
+          <p>
+            File: <code>{loadError.file}</code> ({loadError.reason}).
+          </p>
+          <p className="muted">No bridge map, route, or findings are shown.</p>
+        </div>
+      </div>
+    );
+  }
   if (!structure)
     return <p className="placeholder">No structure data available.</p>;
 
-  const usingSample = isSample;
   const bounds = elevationBounds(structure);
   const stopR = Math.max(4, ELEV_SCALE * 0.6);
 
@@ -154,9 +180,7 @@ export default function InspectionView() {
     findings.find((f) => f.id === selectedFindingId) ?? null;
 
   const hasRealCredit =
-    !usingSample &&
-    structure.provenance.doi &&
-    structure.provenance.doi !== "n/a";
+    structure.provenance.doi && structure.provenance.doi !== "n/a";
   const credit = hasRealCredit
     ? `${structure.provenance.source} — ${structure.provenance.license} (${structure.provenance.doi})`
     : null;
@@ -177,13 +201,6 @@ export default function InspectionView() {
         <div className="dispatch-banner" role="status">
           Frequency shift detected. Location unknown: inspecting all connection
           locations.
-        </div>
-      )}
-
-      {usingSample && (
-        <div className="sample-banner" role="status">
-          Showing sample geometry, not the real KW51 bridge. The KW51 layout file
-          could not be loaded.
         </div>
       )}
 
@@ -263,11 +280,9 @@ export default function InspectionView() {
           </p>
 
           <p className="map-caption muted">
-            {usingSample
-              ? "Geometry: sample placeholder, not the real KW51 bridge (the KW51 layout could not be loaded). Defect findings and images: simulated."
-              : anyRealScores
+            {anyRealScores
               ? "Geometry: real KW51 (KU Leuven FEM, CC BY-NC-SA 4.0). Defect scores: real model on representative concrete images from the CODEBRIM held-out test set, not photographs of KW51. Defect images are placed at chosen connections for demonstration; their locations are not detections."
-              : "Geometry: real KW51 (KU Leuven FEM, CC BY-NC-SA 4.0). Defect findings and images: simulated."}
+              : "Geometry: real KW51 (KU Leuven FEM, CC BY-NC-SA 4.0). Defect scores: none shown, because no imaged connection was scored by the defect model."}
           </p>
           {credit && <p className="map-credit muted">{credit}</p>}
         </div>

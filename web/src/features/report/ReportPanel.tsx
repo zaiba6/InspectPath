@@ -33,7 +33,8 @@ export default function ReportPanel() {
     let active = true;
     const src = getDataSource();
     getInspectionData().then((d) => {
-      if (!active) return;
+      // On a load error the inspection view shows the message; no report data.
+      if (!active || !d.ok) return;
       setStructure(d.structure);
       src.getFindings(d.structure).then((f) => {
         if (active) setFindings(f);
@@ -50,7 +51,7 @@ export default function ReportPanel() {
   useEffect(() => {
     let active = true;
     getInspectionData().then((d) => {
-      if (active) setPlan(d.plans[selectedPlan]);
+      if (active && d.ok) setPlan(d.plans[selectedPlan]);
     });
     return () => {
       active = false;

@@ -22,8 +22,8 @@ export interface DataSource {
   // The UI uses this to avoid claiming real data in the monitor subtitle/footer.
   readonly isMock: boolean;
   getReplay(dataset: string): Promise<LoadResult<TriggerRecord[]>>; // [contract §2]
-  getMetricStructure(): Promise<MetricStructure>; // [contract §3b]
-  getMetricPlan(type: PlanType): Promise<MetricPlan>; // [contract §4b]
+  getMetricStructure(): Promise<LoadResult<MetricStructure>>; // [contract §3b]
+  getMetricPlan(type: PlanType): Promise<LoadResult<MetricPlan>>; // [contract §4b]
   getImageMap(): Promise<ImageMap>; // [contract §5]
   getFindings(structure: MetricStructure): Promise<Finding[]>; // [dashboard-internal]
 }

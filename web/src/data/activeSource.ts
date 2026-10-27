@@ -1,7 +1,5 @@
 import type { DataSource } from "./source";
-import { mockSource } from "./mockSource";
 import { realSource } from "./realSource";
-import { addWarning } from "./dataWarnings";
 import type { MetricPlan, MetricStructure, PlanType } from "./types";
 
 // The dashboard reads only the real data/ files. There is no mock source to
@@ -26,26 +24,16 @@ export function getDataSource(): DataSource {
 }
 
 // ---- Coherent metric geometry + plans ----
-// The inspection view and the report both need the structure AND a plan, and
-// they must never mix real geometry with sample plans (or the reverse), nor show
-// real stats over sample geometry. getInspectionData resolves all of it as ONE
-// coherent unit and reports whether the result is real or sample:
-//   - if the structure fell back to the sample, the plans use the sample too;
-//   - if a real plan's stops reference locations absent from the real structure,
-//     the whole bundle degrades to the sample (warn), because a real plan that
-//     does not match the real geometry is a data-integrity failure, not a view we
-//     should render with mixed data.
+// The inspection view and the report both need the structure AND both plans.
+// getInspectionData resolves them as ONE unit: either all real and consistent,
+// or an error naming the file that failed. There is no sample to fall back to:
+//   - a missing or invalid layout or plan file is an error naming that file;
+//   - a plan whose stops reference locations absent from the layout is an error
+//     naming the plan file, because mismatched data must not be rendered.
 
-// The real KW51 layout carries id "kw51"; any other id is the sample fallback.
-export function isSampleStructure(s: MetricStructure): boolean {
-  return s.id !== "kw51";
-}
-
-export interface InspectionData {
-  structure: MetricStructure;
-  plans: Record<PlanType, MetricPlan>;
-  isSample: boolean; // true when geometry AND plans are the sample fallback
-}
+export type InspectionData =
+  | { ok: true; structure: MetricStructure; plans: Record<PlanType, MetricPlan> }
+  | { ok: false; file: string; reason: string };
 
 let inspectionDataPromise: Promise<InspectionData> | null = null;
 
@@ -54,51 +42,42 @@ export function resetInspectionData(): void {
   inspectionDataPromise = null;
 }
 
-async function sampleBundle(): Promise<InspectionData> {
-  const [structure, naive, optimized] = await Promise.all([
-    mockSource.getMetricStructure(),
-    mockSource.getMetricPlan("naive"),
-    mockSource.getMetricPlan("optimized"),
-  ]);
-  return { structure, plans: { naive, optimized }, isSample: true };
-}
-
 async function resolveInspectionData(): Promise<InspectionData> {
   const src = getDataSource();
   const structure = await src.getMetricStructure();
-
-  // 1. Sample geometry -> sample everything. Never real stats over a sample.
-  if (isSampleStructure(structure)) {
-    return sampleBundle();
+  if (!structure.ok) {
+    return { ok: false, file: structure.file, reason: structure.reason };
   }
 
-  // 2. Real geometry -> load the real plans and verify every stop exists in the
-  //    structure. Any mismatch degrades the whole bundle to the sample.
   const [naive, optimized] = await Promise.all([
     src.getMetricPlan("naive"),
     src.getMetricPlan("optimized"),
   ]);
+  if (!naive.ok) return { ok: false, file: naive.file, reason: naive.reason };
+  if (!optimized.ok) return { ok: false, file: optimized.file, reason: optimized.reason };
+
+  // Every stop in each plan must exist in the layout.
   const locationIds = new Set(
-    structure.diagonal_connections.distinct_locations.map((l) => l.location_id)
+    structure.value.diagonal_connections.distinct_locations.map((l) => l.location_id)
   );
-  for (const [type, plan] of [
-    ["naive", naive],
-    ["optimized", optimized],
-  ] as const) {
-    const missing = plan.stops.filter((s) => !locationIds.has(s.location_id));
+  for (const plan of [naive, optimized]) {
+    const missing = plan.value.stops.filter((s) => !locationIds.has(s.location_id));
     if (missing.length > 0) {
-      addWarning({
-        piece: "plan",
-        message:
-          `Plan "${type}" references ${missing.length} location(s) not in the ` +
-          `loaded structure (e.g. ${missing[0].location_id}). Showing sample ` +
-          `geometry and plans to avoid mixing mismatched data.`,
-      });
-      return sampleBundle();
+      return {
+        ok: false,
+        file: plan.file,
+        reason:
+          `references ${missing.length} location(s) not in ${structure.file} ` +
+          `(e.g. ${missing[0].location_id})`,
+      };
     }
   }
 
-  return { structure, plans: { naive, optimized }, isSample: false };
+  return {
+    ok: true,
+    structure: structure.value,
+    plans: { naive: naive.value, optimized: optimized.value },
+  };
 }
 
 // Resolve (and cache) the coherent structure + plans bundle.

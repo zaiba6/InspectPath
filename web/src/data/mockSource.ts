@@ -26,14 +26,19 @@ export const mockSource: DataSource = {
     return { ok: true, value: replayZ24 as TriggerRecord[], file: "replay_z24.json" };
   },
 
-  async getMetricStructure(): Promise<MetricStructure> {
-    return structureKw51Sample as unknown as MetricStructure;
+  async getMetricStructure(): Promise<LoadResult<MetricStructure>> {
+    return {
+      ok: true,
+      value: structureKw51Sample as unknown as MetricStructure,
+      file: "structure_kw51_sample.json",
+    };
   },
 
-  async getMetricPlan(type: PlanType): Promise<MetricPlan> {
-    return (type === "optimized"
+  async getMetricPlan(type: PlanType): Promise<LoadResult<MetricPlan>> {
+    const value = (type === "optimized"
       ? planKw51OptimizedSample
       : planKw51NaiveSample) as unknown as MetricPlan;
+    return { ok: true, value, file: `plan_kw51_${type}_sample.json` };
   },
 
   async getImageMap(): Promise<ImageMap> {

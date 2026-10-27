@@ -907,8 +907,7 @@ body {
 
 /* ---- KW51 inspection: banners, side toggle, elevation map extras ---- */
 
-.dispatch-banner,
-.sample-banner {
+.dispatch-banner {
   padding: var(--sp-3) var(--sp-4);
   border-radius: var(--radius-sm);
   margin-top: var(--sp-4);
@@ -921,13 +920,6 @@ body {
   background: var(--warning-band);
   border-color: #9e5200;
   color: #7a3f00;
-}
-
-/* Sample-data notice: distinct neutral-gray so it is not mistaken for an alert. */
-.sample-banner {
-  background: #eef1f4;
-  border-color: #8a93a0;
-  color: #3a424d;
 }
 
 .map-side-head {

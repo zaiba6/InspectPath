@@ -124,8 +124,7 @@ describe("real source — loads the real files without falling back", () => {
 
   // Serve the real files through a mocked fetch, exactly as the Vite dev server
   // would (JSON content-type). If anything about the real files were invalid,
-  // realSource would warn and fall back to the sample — these asserts prove it
-  // does not.
+  // realSource would return a load error — these asserts prove it does not.
   function serveRealFiles() {
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -147,7 +146,10 @@ describe("real source — loads the real files without falling back", () => {
     const spy = vi
       .spyOn(console, "warn")
       .mockImplementation((m: string) => void warned.push(m));
-    const s = await realSource.getMetricStructure();
+    const res = await realSource.getMetricStructure();
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    const s = res.value;
     expect(s.id).toBe("kw51");
     expect(s.nodes.length).toBeGreaterThan(1000);
     expect(warned).toEqual([]);
@@ -160,8 +162,12 @@ describe("real source — loads the real files without falling back", () => {
     const spy = vi
       .spyOn(console, "warn")
       .mockImplementation((m: string) => void warned.push(m));
-    const naive = await realSource.getMetricPlan("naive");
-    const optimized = await realSource.getMetricPlan("optimized");
+    const naiveRes = await realSource.getMetricPlan("naive");
+    const optimizedRes = await realSource.getMetricPlan("optimized");
+    expect(naiveRes.ok && optimizedRes.ok).toBe(true);
+    if (!naiveRes.ok || !optimizedRes.ok) return;
+    const naive = naiveRes.value;
+    const optimized = optimizedRes.value;
     expect(naive.stops.length).toBe(34);
     expect(optimized.stops.length).toBe(34);
     expect(naive.stats.route_length_m).toBeCloseTo(405.9, 1);
